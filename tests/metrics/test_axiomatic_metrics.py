@@ -231,6 +231,7 @@ def test_completeness(
                     "normalise": True,
                     "disable_warnings": False,
                     "display_progressbar": False,
+                    "features_in_step": 2,
                 },
                 "call": {
                     "explain_func": explain,
