@@ -336,9 +336,7 @@ class NonSensitivity(Metric[List[float]]):
         - Perturbations are applied in groups of size `self.features_in_step`.
         - The perturbation function `self.perturb_func` must follow the Quantus API:
         it receives an array and an index mask, and returns a perturbed copy.
-        - Designed to comply with Quantus internal metric conventions and to be
-        lint-clean under `black` and `flake8`.
-
+        - Returned scores are counts of violations per sample or aggregated across samples.
         """
         if x_batch.shape != a_batch.shape:
             a_batch = np.broadcast_to(a_batch, x_batch.shape)
