@@ -340,7 +340,6 @@ class NonSensitivity(Metric[List[float]]):
         lint-clean under `black` and `flake8`.
 
         """
-        # --- Step 1. Prepare shapes ---
         if x_batch.shape != a_batch.shape:
             a_batch = np.broadcast_to(a_batch, x_batch.shape)
 
@@ -349,18 +348,14 @@ class NonSensitivity(Metric[List[float]]):
         x_flat = x_batch.reshape(B, -1)
         a_flat = a_batch.reshape(B, -1)
 
-        # --- Step 2. Split feature vs non-feature ---
         non_features = a_flat < self.eps
         features = ~non_features
 
-        # --- Step 3. Get base predictions ---
         x_input = model.shape_input(x_batch, x_shape, channel_first=True, batched=True)
         y_pred = model.predict(x_input)[np.arange(B), y_batch]
 
-        # --- Step 4. Allocate score map ---
         pixel_scores = np.zeros_like(a_flat, dtype=float)
 
-        # --- Helper: perturbation loop ---
         def perturb_and_record(indices_mask, desc="nonfeature"):
             for b in range(B):
                 indices = np.where(indices_mask[b])[0]
@@ -370,16 +365,11 @@ class NonSensitivity(Metric[List[float]]):
 
                 n_steps = math.ceil(n_pixels / self.features_in_step)
                 for step in range(n_steps):
-                    print(
-                        f"Processing batch {b+1}/{B}, {desc} step {step+1}/{n_steps}",
-                        end="\r",
-                    )
                     start = step * self.features_in_step
                     end = min((step + 1) * self.features_in_step, n_pixels)
                     subset_idx = indices[start:end]
                     indices_2d = np.expand_dims(subset_idx, axis=0)
 
-                    # --- Perturb only selected pixels ---
                     perturbed_flat = x_flat.copy()
                     perturbed_flat[b] = self.perturb_func(
                         arr=perturbed_flat[b : b + 1, :],
@@ -391,14 +381,11 @@ class NonSensitivity(Metric[List[float]]):
                     )
                     y_pred_perturb = model.predict(x_input)[np.arange(B), y_batch]
 
-                    # Assign scores for the perturbed pixels
                     pixel_scores[b, subset_idx] = y_pred_perturb[b]
 
-        # --- Step 5. Run loops ---
         perturb_and_record(non_features, "nonfeature")
         perturb_and_record(features, "feature")
 
-        # --- Step 6. Reshape to image shape ---
         preds_differences = np.abs(y_pred[:, np.newaxis] - pixel_scores)
         preds_differences = preds_differences < self.eps
         pixel_scores = pixel_scores.reshape(x_shape)
