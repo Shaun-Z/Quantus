@@ -11,18 +11,34 @@ from quantus.metrics.axiomatic import Completeness, InputInvariance, NonSensitiv
 
 # test_axiomatic_metrics.py  (or similar)
 
+def _ensure_4d(x):
+    """Make sure x is (B, C, H, W), even if passed as (B, N)."""
+    x = np.array(x)
+    if x.ndim == 2:  
+        B, N = x.shape
+        side = int(np.sqrt(N))
+        x = x.reshape(B, 1, side, side)
+    elif x.ndim == 3:  
+        x = x[:, None, :, :]
+    return x
+
 class SensitiveModel(nn.Module):
     def shape_input(self, x, shape, channel_first=True, batched=True):
         return x
+
     def forward(self, x):
+        x = _ensure_4d(x)
         return x.sum(axis=(1, 2, 3), keepdims=True)
+
     def predict(self, x):
+        x = _ensure_4d(x)
         return self.forward(x)
 
 class InsensitiveModel(nn.Module):
     def shape_input(self, x, shape, channel_first=True, batched=True):
         return x
     def forward(self, x):
+        x = _ensure_4d(x)
         B = x.shape[0]
         return np.ones((B, 1), dtype=float) * 100.0
     def predict(self, x):
@@ -32,15 +48,18 @@ class SemiSensitiveModel(nn.Module):
     def shape_input(self, x, shape, channel_first=True, batched=True):
         return x
     def forward(self, x):
+        x = _ensure_4d(x)
         top_sum = x[:, :, 0, :].sum(axis=(1, 2))
         return top_sum[:, None]
     def predict(self, x):
+        x = _ensure_4d(x)
         return self.forward(x)
 
 class TrickModel(nn.Module):
     def shape_input(self, x, shape, channel_first=True, batched=True):
         return x
     def predict(self, x):
+        x = _ensure_4d(x)
         bottom_sum = x[:, :, 1, :].sum(axis=(1, 2))
         return bottom_sum[:, None]
 
