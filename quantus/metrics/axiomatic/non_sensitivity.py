@@ -282,6 +282,9 @@ class NonSensitivity(Metric[List[float]]):
             features_in_step=self.features_in_step,
             input_shape=x_batch.shape[2:],
         )
+   
+
+
 
     def evaluate_batch(
         self,
@@ -292,65 +295,103 @@ class NonSensitivity(Metric[List[float]]):
         **kwargs,
     ) -> List[int]:
         """
-        This method performs XAI evaluation on a single batch of explanations.
-        For more information on the specific logic, we refer the metric’s initialisation docstring.
+                This method performs XAI evaluation on a single batch of explanations.
+                For more information on the specific logic, we refer the metric’s initialisation docstring.
 
-        Parameters
-        ----------
-        model: ModelInterface
-            A ModelInterface that is subject to explanation.
-        x_batch: np.ndarray
-            The input to be evaluated on a batch-basis.
-        y_batch: np.ndarray
-            The output to be evaluated on a batch-basis.
-        a_batch: np.ndarray
-            The explanation to be evaluated on a batch-basis.
-        kwargs:
-            Unused.
+                Parameters
+                ----------
+                model: ModelInterface
+                    A ModelInterface that is subject to explanation.
+                x_batch: np.ndarray
+                    The input to be evaluated on a batch-basis.
+                y_batch: np.ndarray
+                    The output to be evaluated on a batch-basis.
+                a_batch: np.ndarray
+                    The explanation to be evaluated on a batch-basis.
+                kwargs:
+                    Unused.
 
-        Returns
-        -------
-        scores_batch:
-             The evaluation results.
-        """
-
+                Returns
+                -------
+                np.ndarray
+                    Array of shape (batch_size,), per sample score. 
+                    Lower values are better.
+                """
+        
         # Prepare shapes. Expand a_batch if not the same shape
         if x_batch.shape != a_batch.shape:
             a_batch = np.broadcast_to(a_batch, x_batch.shape)
 
         # Flatten the attributions.
         batch_size = a_batch.shape[0]
+        x_shape = x_batch.shape
+        x_batch = x_batch.reshape(batch_size, -1)
         a_batch = a_batch.reshape(batch_size, -1)
-        n_features = a_batch.shape[-1]
 
         non_features = a_batch < self.eps
+        features = ~non_features
 
-        x_input = model.shape_input(x_batch, x_batch.shape, channel_first=True, batched=True)
+        x_input = model.shape_input(x_batch, x_shape, channel_first=True, batched=True)
         y_pred = model.predict(x_input)[np.arange(batch_size), y_batch]
 
-        # Prepare lists.
-        n_perturbations = math.ceil(n_features / self.features_in_step)
-        preds = []
-        x_perturbed = x_batch.copy()
-        x_batch_shape = x_batch.shape
-        a_indices = np.stack([np.arange(n_features) for _ in x_batch])
-        for perturbation_step_index in range(n_perturbations):
-            # Perturb input by indices of attributions.
-            a_ix = a_indices[
-                :,
-                perturbation_step_index * self.features_in_step : (perturbation_step_index + 1) * self.features_in_step,
-            ]
-            x_perturbed = self.perturb_func(
-                arr=x_batch.reshape(batch_size, -1),
-                indices=a_ix,
-            )
-            x_perturbed = x_perturbed.reshape(*x_batch_shape)
+        pixel_scores_non = self._process_mask(
+            model, x_batch, y_batch, non_features, x_shape
+        )
+        pixel_scores_feat = self._process_mask(
+            model, x_batch, y_batch, features, x_shape
+        )
 
-            # Predict on perturbed input x.
-            x_input = model.shape_input(x_perturbed, x_batch.shape, channel_first=True, batched=True)
-            y_pred_perturb = model.predict(x_input)[np.arange(batch_size), y_batch]
-            preds.append(y_pred_perturb)
-        preds = np.stack(preds, axis=1)
-        preds_differences = abs(preds - y_pred[:, None]) < self.eps
+        preds_differences = np.abs(
+            y_pred[:, None] - (pixel_scores_non + pixel_scores_feat)
+        ) < self.eps
 
         return (preds_differences ^ non_features).sum(-1)
+
+    def _create_index_groups(self, mask: np.ndarray) -> List[np.ndarray]:
+        """Divide mask indices into perturbation groups."""
+        indices = np.where(mask)[0]
+        return [
+            indices[i:i + self.features_in_step]
+            for i in range(0, len(indices), self.features_in_step)
+        ]
+
+    def _perturb_sample_batch(
+        self, x_batch: np.ndarray, b: int, indices: np.ndarray
+    ) -> np.ndarray:
+        """Perturb a single sample within the batch."""
+        perturbed_flat = x_batch.copy()
+        indices_2d = np.expand_dims(indices, axis=0)
+        perturbed_flat[b] = self.perturb_func(
+            arr=perturbed_flat[b:b + 1, :],
+            indices=indices_2d,
+        )
+        return perturbed_flat
+
+    def _predict_scores(
+        self, model, x_batch: np.ndarray, y_batch: np.ndarray, x_shape: tuple
+    ) -> np.ndarray:
+        """Predict scores for the true labels of the given batch."""
+        x_input = model.shape_input(
+            x_batch.reshape(x_shape), x_shape, channel_first=True, batched=True
+        )
+        return model.predict(x_input)[np.arange(x_batch.shape[0]), y_batch]
+
+    def _process_mask(
+        self,
+        model,
+        x_batch: np.ndarray,
+        y_batch: np.ndarray,
+        mask: np.ndarray,
+        x_shape: tuple,
+    ) -> np.ndarray:
+        """Handle perturbation and prediction workflow for a single mask type."""
+        batch_size = x_batch.shape[0]
+        pixel_scores = np.zeros_like(x_batch, dtype=float)
+
+        for b in range(batch_size):
+            for indices in self._create_index_groups(mask[b]):
+                perturbed_batch = self._perturb_sample_batch(x_batch, b, indices)
+                preds = self._predict_scores(model, perturbed_batch, y_batch, x_shape)
+                pixel_scores[b, indices] = preds[b]
+
+        return pixel_scores
