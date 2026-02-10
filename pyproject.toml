@@ -6,7 +6,7 @@ name = "quantus"
 # https://www.python.org/dev/peps/pep-0440/
 description = "A metrics toolkit to evaluate neural network explanations."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.8.1"
 license = { file = "LICENSE" }
 keywords = ["explainable ai", "xai", "machine learning", "deep learning"]
 authors = [
