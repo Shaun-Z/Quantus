@@ -9,11 +9,7 @@ similarity-, normalisation- functions and explanation methods in Quantus."""
 
 import sys
 from typing import List, Dict, Mapping, Type
-from quantus.functions.loss_func import *
-from quantus.functions.normalise_func import *
-from quantus.functions.perturb_func import *
-from quantus.functions.similarity_func import *
-from quantus.functions import n_bins_func
+from quantus.functions import n_bins_func, perturb_func, similarity_func, normalise_func, loss_func, norm_func
 from quantus.metrics import *
 
 if sys.version_info >= (3, 8):
@@ -76,39 +72,39 @@ AVAILABLE_METRICS: Final[Mapping[str, Mapping[str, Type[Metric]]]] = {
 
 
 AVAILABLE_PERTURBATION_FUNCTIONS = {
-    "baseline_replacement_by_indices": baseline_replacement_by_indices,
-    "baseline_replacement_by_shift": baseline_replacement_by_shift,
-    "baseline_replacement_by_blur": baseline_replacement_by_blur,
-    "gaussian_noise": gaussian_noise,
-    "uniform_noise": uniform_noise,
-    "rotation": rotation,
-    "translation_x_direction": translation_x_direction,
-    "translation_y_direction": translation_y_direction,
-    "no_perturbation": no_perturbation,
-    "noisy_linear_imputation": noisy_linear_imputation,
+    "baseline_replacement_by_indices": perturb_func.baseline_replacement_by_indices,
+    "baseline_replacement_by_shift": perturb_func.baseline_replacement_by_shift,
+    "baseline_replacement_by_blur": perturb_func.baseline_replacement_by_blur,
+    "gaussian_noise": perturb_func.gaussian_noise,
+    "uniform_noise": perturb_func.uniform_noise,
+    "rotation": perturb_func.rotation,
+    "translation_x_direction": perturb_func.translation_x_direction,
+    "translation_y_direction": perturb_func.translation_y_direction,
+    "no_perturbation": perturb_func.no_perturbation,
+    "noisy_linear_imputation": perturb_func.noisy_linear_imputation,
 }
 
 
 AVAILABLE_SIMILARITY_FUNCTIONS = {
-    "correlation_spearman": correlation_spearman,
-    "correlation_pearson": correlation_pearson,
-    "correlation_kendall_tau": correlation_kendall_tau,
-    "distance_euclidean": distance_euclidean,
-    "distance_manhattan": distance_manhattan,
-    "distance_chebyshev": distance_chebyshev,
-    "lipschitz_constant": lipschitz_constant,
-    "abs_difference": abs_difference,
-    "squared_difference": squared_difference,
-    "difference": difference,
-    "cosine": cosine,
-    "ssim": ssim,
-    "mse": mse,
+    "correlation_spearman": similarity_func.correlation_spearman,
+    "correlation_pearson": similarity_func.correlation_pearson,
+    "correlation_kendall_tau": similarity_func.correlation_kendall_tau,
+    "distance_euclidean": similarity_func.distance_euclidean,
+    "distance_manhattan": similarity_func.distance_manhattan,
+    "distance_chebyshev": similarity_func.distance_chebyshev,
+    "lipschitz_constant": similarity_func.lipschitz_constant,
+    "abs_difference": similarity_func.abs_difference,
+    "squared_difference": similarity_func.squared_difference,
+    "difference": similarity_func.difference,
+    "cosine": similarity_func.cosine,
+    "ssim": similarity_func.ssim,
+    "mse": loss_func.mse,
 }
 
 AVAILABLE_NORMALISATION_FUNCTIONS = {
-    "normalise_by_negative": normalise_by_negative,
-    "normalise_by_max": normalise_by_max,
-    "denormalise": denormalise,
+    "normalise_by_negative": normalise_func.normalise_by_negative,
+    "normalise_by_max": normalise_func.normalise_by_max,
+    "denormalise": normalise_func.denormalise,
 }
 
 
