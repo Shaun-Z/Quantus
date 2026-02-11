@@ -91,16 +91,20 @@ def normalise_by_negative(
     a_min = a.min(axis=normalise_axes, keepdims=True)
 
     # Case a.min() >= 0.0.
+    pos_div = np.zeros_like(a)
+    np.divide(a, a_max, out=pos_div, where=a_max != 0)
     return_array = np.where(
         a_min >= 0.0,
-        np.divide(a, a_max, where=a_max != 0),
+        pos_div,
         return_array,
     )
 
     # Case a.max() <= 0.0.
+    neg_div = np.zeros_like(a)
+    np.divide(a, a_min, out=neg_div, where=a_min != 0)
     return_array = np.where(
         a_max <= 0.0,
-        -np.divide(a, a_min, where=a_min != 0),
+        -neg_div,
         return_array,
     )
 
@@ -112,8 +116,7 @@ def normalise_by_negative(
         try:
             return_array = np.where(
                 np.logical_and(a_min < 0.0, a_max > 0.0),
-                (a > 0.0) * np.divide(a, a_max, where=a_max != 0)
-                - (a < 0.0) * np.divide(a, a_min, where=a_min != 0),
+                (a > 0.0) * pos_div - (a < 0.0) * neg_div,
                 return_array,
             )
         except RuntimeWarning:
